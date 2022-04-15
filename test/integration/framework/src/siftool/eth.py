@@ -24,6 +24,10 @@ def web3_ropsten_alchemy_url(alchemy_id):
 def web3_host_port_url(host, port):
     return "ws://{}:{}".format(host, port)
 
+def web3_create_account():
+    account = web3.Web3().eth.account.create()
+    return account.address, account.key.hex()[2:]
+
 def web3_connect(url, websocket_timeout=None):
     kwargs = {}
     if websocket_timeout is not None:
@@ -113,9 +117,9 @@ class EthereumTxWrapper:
             # self.w3_conn.geth.personal.import_raw_key(private_key, "")
             pass
 
+    # Obsolete
     def create_new_eth_account(self):
-        account = self.w3_conn.eth.account.create()
-        return account.address, account.key.hex()[2:]
+        return web3_create_account()
 
     # TODO This only works for local nodes (i.e. geth, ganache).
     # It does not work with hosted nodes such as Alchemy, because they don't hold users' private keys.

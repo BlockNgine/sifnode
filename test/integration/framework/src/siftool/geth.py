@@ -1,5 +1,7 @@
 import json
 import re
+from typing import Mapping, Any, Iterable
+from siftool import eth, command
 from siftool.common import *
 
 
@@ -17,7 +19,7 @@ def js_fmt(str, *params):
 class Geth:
     def __init__(self, cmd):
         self.cmd = cmd
-        self.program = "/home/jurez/work/projects/sif/downloads/geth-linux-amd64-1.10.9-eae3b194/geth"
+        self.program = "geth"
 
     def geth_cmd(self, network_id=None, datadir=None, ipcpath=None, ws=False, ws_addr=None, ws_port=None, ws_api=None,
         http=False, http_addr=None, http_port=None, http_api=None, rpc_allow_unprotected_txs=False, dev=False,
@@ -105,7 +107,7 @@ class Geth:
             self.cmd.write_text_file(passfile, password)
             self.cmd.write_text_file(keyfile, private_key)
             args = [self.program, "account", "import", keyfile, "--password", passfile] + \
-                   (["--datadir", datadir] if datadir else [])
+                (["--datadir", datadir] if datadir else [])
             res = self.cmd.execst(args)
             address = "0x" + re.compile("^Address: \\{(.*)\\}$").match(exactly_one(stdout_lines(res)))[1]
             return address
@@ -159,6 +161,61 @@ class Geth:
 
     # </editor-fold>
 
+    def create_genesis_config_clique(self, chain_id: int, signer_addresses: Iterable[eth.Address],
+        alloc: Mapping[eth.Address, int], gas_limit: int = 8000000, difficulty: int = 1
+    ) -> Mapping[str, Any]:
+        # See https://geth.ethereum.org/docs/interface/private-network
+        # signer_address = "7df9a875a174b3bc565e6424a0050ebc1b2d1d82"
+        # alloc = {
+        #     signer_address.lower()[2:]: 300000,
+        #     "f41c74c9ae680c1aa78f42e5647a62f353b7bdde": 400000,
+        # }
+        # chain_id = 15
+        extradata = "0x" + "00"*32 + ''.join([addr.lower()[2:] for addr in signer_addresses]) + "00"*65
+        return {
+            "config": {
+                "chainId": chain_id,
+                "homesteadBlock": 0,
+                "eip150Block": 0,
+                "eip155Block": 0,
+                "eip158Block": 0,
+                "byzantiumBlock": 0,
+                "constantinopleBlock": 0,
+                "petersburgBlock": 0,
+                "clique": {
+                    "period": 5,
+                    "epoch": 30000
+                }
+            },
+            "difficulty": str(difficulty),
+            "gasLimit": str(gas_limit),
+            "extradata": extradata,
+            "alloc": {k: {"balance": str(v)} for k, v in alloc.items()}
+        }
+
+    def run_env(self, path):
+        signer_addr, signer_private_key = eth.web3_create_account()
+        ethereum_chain_id = 9999
+        if self.cmd.exists(path):
+            self.cmd.rmdir(path)
+        if not self.cmd.exists(path):
+            datadir = path
+            self.cmd.mkdir(datadir)
+            tmp_genesis_file = self.cmd.mktempfile()
+            try:
+                genesis = self.create_genesis_config_clique(ethereum_chain_id, [signer_addr], {signer_addr: 1000000})
+                self.cmd.write_text_file(tmp_genesis_file, json.dumps(genesis))
+                args = [self.program, "init", tmp_genesis_file] + \
+                    (["--datadir", datadir] if datadir else [])
+                # cmd = command.buildcmd(args=args)
+                res = self.cmd.execst(args)
+                print(repr(res))
+            finally:
+                self.cmd.rm(tmp_genesis_file)
+
+    def run_geth(self, datadir, network_id):
+        args = [self.program, "--networkid", str(network_id), "--nodiscover"] + \
+            (["--datadir", datadir] if datadir else [])
 
 # How Wilson is running geth:
 # https://github.com/Sifchain/sifnode/commit/3e4feff2d5f707109aa609b8941f06d3cd349c92

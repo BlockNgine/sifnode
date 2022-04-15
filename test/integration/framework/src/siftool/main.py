@@ -128,6 +128,11 @@ def main(argv):
     elif what == "download-ibc-binaries":
         import localnet
         localnet.download_ibc_binaries(cmd, *argv[1:])
+    elif what == "geth":
+        import siftool.geth
+        geth = siftool.geth.Geth(cmd)
+        path = os.path.join(os.environ["HOME"], ".siftool-geth")
+        geth.run_env(path)
     else:
         raise Exception("Missing/unknown command")
 
