@@ -208,14 +208,30 @@ class Geth:
                 args = [self.program, "init", tmp_genesis_file] + \
                     (["--datadir", datadir] if datadir else [])
                 # cmd = command.buildcmd(args=args)
-                res = self.cmd.execst(args)
-                print(repr(res))
+                return self.cmd.execst(args)
             finally:
                 self.cmd.rm(tmp_genesis_file)
 
-    def run_geth(self, datadir, network_id):
+    def init(self, ethereum_chain_id: int, signers: Iterable[eth.Address], datadir: Optional[str] = None):
+        tmp_genesis_file = self.cmd.mktempfile()
+        try:
+            genesis = self.create_genesis_config_clique(ethereum_chain_id, signers, {signer_addr: 1000000})
+            self.cmd.write_text_file(tmp_genesis_file, json.dumps(genesis))
+            args = [self.program, "init", tmp_genesis_file] + \
+                (["--datadir", datadir] if datadir else [])
+            # cmd = command.buildcmd(args=args)
+            res = self.cmd.execst(args)
+            print(repr(res))
+        finally:
+            self.cmd.rm(tmp_genesis_file)
+
+    def run(self, datadir, network_id):
         args = [self.program, "--networkid", str(network_id), "--nodiscover"] + \
             (["--datadir", datadir] if datadir else [])
+        exec_args = command.buildcmd(args)
+        geth_proc = self.cmd.spawn_asynchronous_process(exec_args)
+        return geth_proc
+
 
 # How Wilson is running geth:
 # https://github.com/Sifchain/sifnode/commit/3e4feff2d5f707109aa609b8941f06d3cd349c92

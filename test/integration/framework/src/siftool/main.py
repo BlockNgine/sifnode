@@ -129,10 +129,13 @@ def main(argv):
         import localnet
         localnet.download_ibc_binaries(cmd, *argv[1:])
     elif what == "geth":
-        import siftool.geth
+        import siftool.geth, siftool.eth
         geth = siftool.geth.Geth(cmd)
-        path = os.path.join(os.environ["HOME"], ".siftool-geth")
-        geth.run_env(path)
+        datadir = os.path.join(os.environ["HOME"], ".siftool-geth")
+        datadir = None
+        signer_addr, signer_private_key = siftool.eth.web3_create_account()
+        ethereum_chain_id = 9999
+        geth.init(ethereum_chain_id, [signer_addr], datadir)
     else:
         raise Exception("Missing/unknown command")
 
