@@ -212,10 +212,13 @@ class Geth:
             finally:
                 self.cmd.rm(tmp_genesis_file)
 
-    def init(self, ethereum_chain_id: int, signers: Iterable[eth.Address], datadir: Optional[str] = None):
+    def init(self, ethereum_chain_id: int, signers: Iterable[eth.Address], datadir: Optional[str] = None,
+        funds_alloc: Optional[Mapping[eth.Address, int]] = None
+    ):
+        funds_alloc = funds_alloc or {}
         tmp_genesis_file = self.cmd.mktempfile()
         try:
-            genesis = self.create_genesis_config_clique(ethereum_chain_id, signers, {signer_addr: 1000000})
+            genesis = self.create_genesis_config_clique(ethereum_chain_id, signers, funds_alloc)
             self.cmd.write_text_file(tmp_genesis_file, json.dumps(genesis))
             args = [self.program, "init", tmp_genesis_file] + \
                 (["--datadir", datadir] if datadir else [])
@@ -225,12 +228,10 @@ class Geth:
         finally:
             self.cmd.rm(tmp_genesis_file)
 
-    def run(self, datadir, network_id):
+    def buid_run_args(self, datadir, network_id):
         args = [self.program, "--networkid", str(network_id), "--nodiscover"] + \
             (["--datadir", datadir] if datadir else [])
-        exec_args = command.buildcmd(args)
-        geth_proc = self.cmd.spawn_asynchronous_process(exec_args)
-        return geth_proc
+        return command.buildcmd(args)
 
 
 # How Wilson is running geth:

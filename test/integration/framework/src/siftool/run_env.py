@@ -3,7 +3,9 @@ import re
 import time
 from typing import List, Tuple, TextIO, Any
 
-from siftool import eth, hardhat, cosmos, command
+from siftool import eth, cosmos, command
+from siftool.hardhat import Hardhat, default_accounts as hardhat_default_accounts
+from siftool.geth import Geth
 from siftool.truffle import Ganache
 from siftool.localnet import Localnet
 from siftool.command import Command
@@ -773,7 +775,7 @@ class IntegrationTestsEnvironment:
 class Peggy2Environment(IntegrationTestsEnvironment):
     def __init__(self, cmd: Command):
         super().__init__(cmd)
-        self.hardhat = hardhat.Hardhat(cmd)
+        self.use_geth_instead_of_hardhat = False
 
     # Destuctures a linear array of EVM accounts into:
     # [operator, owner, pauser, [validator-0, validator-1, ...], [...available...]]
@@ -814,11 +816,9 @@ class Peggy2Environment(IntegrationTestsEnvironment):
 
         self.cmd.rmdir(self.cmd.get_user_home(".sifnoded"))  # Purge test keyring backend
 
-        hardhat_bind_hostname = "localhost"  # The host to which to bind to for new connections (Defaults to 127.0.0.1 running locally, and 0.0.0.0 in Docker)
-        hardhat_port = 8545  # The port on which to listen for new connections (default: 8545)
-        hardhat_exec_args = self.hardhat.build_start_args(hostname=hardhat_bind_hostname, port=hardhat_port)
-        hardhat_proc = self.cmd.spawn_asynchronous_process(hardhat_exec_args, log_file=hardhat_log_file)
+        ethereum_chain_id = 9999
 
+        hardhat = Hardhat(self.cmd)
         # This determines how many EVM accounts we want to allocate for validators.
         # Since every validator needs on EVM account, this should be equal to the number of validators (possibly more).
         hardhat_validator_count = 1
@@ -829,19 +829,35 @@ class Peggy2Environment(IntegrationTestsEnvironment):
         # The value is not used; instead a hardcoded constant 9999 is passed to ebrelayerWitnessBuilder.
         # Ask juniuszhou for details.
         hardhat_chain_id = 9999
-        hardhat_accounts = self.signer_array_to_ethereum_accounts(hardhat.default_accounts(), hardhat_validator_count)
 
-        self.hardhat.compile_smart_contracts()
-        peggy_sc_addrs = self.hardhat.deploy_smart_contracts()
+        hardhat_accounts = self.signer_array_to_ethereum_accounts(hardhat_default_accounts(), hardhat_validator_count)
 
         # Initialization of smart contracts (technically this is part of deployment)
         operator_acct = hardhat_accounts["operator"]
+
+        if self.use_geth_instead_of_hardhat:
+            geth = Geth(self.cmd)
+            geth_datadir = self.cmd.mktempdir()
+            operator_addr = operator_acct[0]
+            geth.init(ethereum_chain_id, [operator_addr], datadir=geth_datadir, funds_alloc={operator_addr: 10**6})
+            geth_run_args = geth.buid_run_args(geth_datadir, ethereum_chain_id)
+            geth_proc = self.cmd.spawn_asynchronous_process(geth_run_args, log_file=hardhat_log_file)
+            hardhat_proc = geth_proc
+        else:
+            hardhat_bind_hostname = "localhost"  # The host to which to bind to for new connections (Defaults to 127.0.0.1 running locally, and 0.0.0.0 in Docker)
+            hardhat_port = 8545  # The port on which to listen for new connections (default: 8545)
+            hardhat_exec_args = hardhat.build_start_args(hostname=hardhat_bind_hostname, port=hardhat_port)
+            hardhat_proc = self.cmd.spawn_asynchronous_process(hardhat_exec_args, log_file=hardhat_log_file)
+
+        hardhat.compile_smart_contracts()
+        peggy_sc_addrs = hardhat.deploy_smart_contracts()
+
         w3_websocket_address = eth.web3_host_port_url("localhost", hardhat_port)
         self.init_smart_contracts(w3_websocket_address, operator_acct, peggy_sc_addrs)
 
         admin_account_name = "sifnodeadmin"
         chain_id = "localnet"
-        ceth_symbol = sifchain_denom_hash(hardhat_chain_id, eth.NULL_ADDRESS)
+        ceth_symbol = sifchain_denom_hash(ethereum_chain_id, eth.NULL_ADDRESS)
         assert ceth_symbol == "sifBridge99990x0000000000000000000000000000000000000000"
         # This goes to validator0, i.e. sifnode_validators[0]["address"]
         validator_mint_amounts: cosmos.LegacyBalance = [
@@ -867,7 +883,7 @@ class Peggy2Environment(IntegrationTestsEnvironment):
         self.cmd.mkdir(sifnoded_network_dir)
         network_config_file, sifnoded_exec_args, sifnoded_proc, tcp_url, admin_account_address, sifnode_validators, \
             sifnode_relayers, sifnode_witnesses, sifnode_validator0_home, chain_dir = \
-                self.init_sifchain(sifnoded_network_dir, sifnoded_log_file, chain_id, hardhat_chain_id,
+                self.init_sifchain(sifnoded_network_dir, sifnoded_log_file, chain_id, ethereum_chain_id,
                     validator_mint_amounts, validator_power, seed_ip_address, tendermint_port, denom_whitelist_file,
                     admin_account_mint_amounts, registry_json, admin_account_name, ceth_symbol)
 
@@ -877,7 +893,7 @@ class Peggy2Environment(IntegrationTestsEnvironment):
 
         symbol_translator_file = os.path.join(self.test_integration_dir, "config", "symbol_translator.json")
         [relayer0_exec_args], [witness0_exec_args] = \
-        self.start_witnesses_and_relayers(w3_websocket_address, hardhat_chain_id, tcp_url,
+        self.start_witnesses_and_relayers(w3_websocket_address, ethereum_chain_id, tcp_url,
             chain_id, peggy_sc_addrs, hardhat_accounts["validators"], sifnode_validators, sifnode_relayers,
             sifnode_witnesses, symbol_translator_file)
 
@@ -895,7 +911,7 @@ class Peggy2Environment(IntegrationTestsEnvironment):
             },
             "symbol_translator_file": symbol_translator_file,
             "w3_websocket_address": w3_websocket_address,
-            "evm_chain_id": hardhat_chain_id,
+            "evm_chain_id": ethereum_chain_id,
             "chain_id": chain_id,
             "validators": sifnode_validators,  # From yaml file generated by sifgen
             "relayers": sifnode_relayers,
@@ -904,7 +920,7 @@ class Peggy2Environment(IntegrationTestsEnvironment):
 
         self.write_env_files(self.project.project_dir(), self.project.go_bin_dir, peggy_sc_addrs, hardhat_accounts,
             admin_account_name, admin_account_address, sifnode_validator0_home, sifnode_validators, sifnode_relayers,
-            sifnode_witnesses, tcp_url, hardhat_bind_hostname, hardhat_port, hardhat_chain_id, chain_dir,
+            sifnode_witnesses, tcp_url, hardhat_bind_hostname, hardhat_port, ethereum_chain_id, chain_dir,
             sifnoded_exec_args, relayer0_exec_args, witness0_exec_args
         )
 

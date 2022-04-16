@@ -1,3 +1,4 @@
+import argparse
 import sys
 import time
 
@@ -19,6 +20,7 @@ def main(argv):
     what = argv[0] if argv else None
     cmd = Integrator()
     project = cmd.project
+    argparser = argparse.ArgumentParser()
     if what == "project-init":
         project.init()
     elif what == "clean":
@@ -35,9 +37,12 @@ def main(argv):
         e.stack_push()
     elif what == "run-env":
         if on_peggy2_branch:
+            argparser.add_argument("--geth", action="store_true", default=False)
+            args = argparser.parse_args(argv[1:])
             # Equivalent to future/devenv - hardhat, sifnoded, ebrelayer
             # I.e. cd smart-contracts; GOBIN=/home/anderson/go/bin npx hardhat run scripts/devenv.ts
             env = Peggy2Environment(cmd)
+            env.use_geth_instead_of_hardhat = args.geth
             processes = env.run()
         else:
             env = IntegrationTestsEnvironment(cmd)
