@@ -1,4 +1,6 @@
 module.exports.loadEnv = function () {
+  console.log(process.env)
+
   if (process.env.CONSENSUS_THRESHOLD.length === 0) {
     return console.error("Must provide consensus threshold as environment variable.");
   }

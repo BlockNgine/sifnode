@@ -43,6 +43,8 @@ export async function hreToSifchainAccountsAsync(
   hardhat: HardhatRuntimeEnvironment
 ): Promise<SifchainAccounts> {
   const accounts = await hardhat.ethers.getSigners()
+  console.log(JSON.stringify(accounts))
+  // console.log(JSON.stringify(hardhat.ethers))
   const [operatorAccount, ownerAccount, pauserAccount, validator1Account, ...extraAccounts] =
     accounts
   return new SifchainAccounts(
