@@ -4,7 +4,7 @@ import web3
 import eth_typing
 from hexbytes import HexBytes
 from web3.types import TxReceipt
-from typing import NewType, Sequence
+from typing import NewType, Sequence, Tuple
 
 from siftool.common import *
 
@@ -14,6 +14,7 @@ GWEI = 10**9
 NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
 MIN_TX_GAS = 21000
 Address = eth_typing.AnyAddress
+PrivateKey = eth_typing.HexStr
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ def web3_wait_for_connection_up(url, polling_time=1, timeout=90):
             raise Exception(f"Timeout when trying to connect to {url}")
         time.sleep(polling_time)
 
-def validate_address_and_private_key(addr, private_key):
+def validate_address_and_private_key(addr: Optional[Address], private_key: PrivateKey
+) -> Tuple[Address, Optional[PrivateKey]]:
     a = web3.Web3().eth.account
     addr = web3.Web3.toChecksumAddress(addr) if addr else None
     if private_key:

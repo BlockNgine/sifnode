@@ -17,15 +17,20 @@ def js_fmt(str, *params):
 # - Running a standalone private Geth node for non-production purpose: https://medium.com/coinmonks/running-a-standalone-private-geth-node-for-non-production-purpose-d6e0ff226150
 
 class Geth:
-    def __init__(self, cmd):
+    def __init__(self, cmd: command.Command, datadir: Optional[str] = None):
         self.cmd = cmd
         self.program = "geth"
+        self.datadir = datadir
 
-    def geth_cmd(self, network_id=None, datadir=None, ipcpath=None, ws=False, ws_addr=None, ws_port=None, ws_api=None,
-        http=False, http_addr=None, http_port=None, http_api=None, rpc_allow_unprotected_txs=False, dev=False,
-        dev_period=None, rpcvhosts=None, mine=False, miner_threads=None
+    def geth_cmd(self, command: str, network_id: Optional[int] = None, datadir: Optional[str] = None,
+        ipcpath: Optional[str] = None, ws: Optional[bool] = False, ws_addr: Optional[str] = None,
+        ws_port: Optional[int] = None, ws_api: Iterable[str] = None, http: Optional[bool] = False,
+        http_addr: Optional[str] = None, http_port: Optional[int] = None, http_api: Iterable[str] = None,
+        rpc_allow_unprotected_txs: Optional[bool] = False, dev: Optional[bool] = False,
+        dev_period: Optional[int] = None, rpcvhosts: Optional[str] = None, mine: Optional[bool] = False,
+        miner_threads: Optional[int] = None
      ):
-        args = [self.program] + \
+        args = [self.program, command] + \
             (["--networkid", str(network_id)] if network_id else []) + \
             (["--datadir", datadir] if datadir else []) + \
             (["--ipcpath", ipcpath] if ipcpath else []) + \
@@ -99,18 +104,20 @@ class Geth:
     # Private key has is a hex string without "0x" prefix
     # Datadir cannot be the same datadir that a running geth uses
     # See "Creating an account by importing a private key": https://geth.ethereum.org/docs/interface/managing-your-accounts
-    def create_account(self, password, private_key, datadir=None):
+    def create_account(self, private_key: eth.PrivateKey, password: Optional[str] = None):
         assert (not private_key.startswith("0x")) and (len(private_key) == 64)
+        addr, key = eth.validate_address_and_private_key(None, private_key)
         passfile = self.cmd.mktempfile()
         keyfile = self.cmd.mktempfile()
         try:
-            self.cmd.write_text_file(passfile, password)
+            self.cmd.write_text_file(passfile, password or "")
             self.cmd.write_text_file(keyfile, private_key)
             args = [self.program, "account", "import", keyfile, "--password", passfile] + \
-                (["--datadir", datadir] if datadir else [])
+                (["--datadir", self.datadir] if self.datadir else [])
             res = self.cmd.execst(args)
             address = "0x" + re.compile("^Address: \\{(.*)\\}$").match(exactly_one(stdout_lines(res)))[1]
-            return address
+            assert addr.lower() == address
+            return addr
         finally:
             self.cmd.rm(keyfile)
             self.cmd.rm(passfile)
@@ -195,6 +202,7 @@ class Geth:
 
     def run_env(self, path):
         signer_addr, signer_private_key = eth.web3_create_account()
+        signers = [eth.web3_create_account() for _ in range(10)]
         ethereum_chain_id = 9999
         if self.cmd.exists(path):
             self.cmd.rmdir(path)
@@ -203,7 +211,7 @@ class Geth:
             self.cmd.mkdir(datadir)
             tmp_genesis_file = self.cmd.mktempfile()
             try:
-                genesis = self.create_genesis_config_clique(ethereum_chain_id, [signer_addr], {signer_addr: 1000000})
+                genesis = self.create_genesis_config_clique(ethereum_chain_id, [x[0] for x in signers], {signer_addr: 10**20})
                 self.cmd.write_text_file(tmp_genesis_file, json.dumps(genesis))
                 args = [self.program, "init", tmp_genesis_file] + \
                     (["--datadir", datadir] if datadir else [])
@@ -212,7 +220,7 @@ class Geth:
             finally:
                 self.cmd.rm(tmp_genesis_file)
 
-    def init(self, ethereum_chain_id: int, signers: Iterable[eth.Address], datadir: Optional[str] = None,
+    def init(self, ethereum_chain_id: int, signers: Iterable[eth.Address],
         funds_alloc: Optional[Mapping[eth.Address, int]] = None
     ):
         funds_alloc = funds_alloc or {}
@@ -221,16 +229,24 @@ class Geth:
             genesis = self.create_genesis_config_clique(ethereum_chain_id, signers, funds_alloc)
             self.cmd.write_text_file(tmp_genesis_file, json.dumps(genesis))
             args = [self.program, "init", tmp_genesis_file] + \
-                (["--datadir", datadir] if datadir else [])
+                (["--datadir", self.datadir] if self.datadir else [])
             # cmd = command.buildcmd(args=args)
             res = self.cmd.execst(args)
             print(repr(res))
         finally:
             self.cmd.rm(tmp_genesis_file)
 
-    def buid_run_args(self, datadir, network_id):
+    def buid_run_args(self, network_id: int, http_port: Optional[int] = None, dev: bool = False, mine: bool = False,
+        unlock: Optional[str] = None, password: Optional[str] = None, allow_insecure_unlock: bool = False,
+    ):
         args = [self.program, "--networkid", str(network_id), "--nodiscover"] + \
-            (["--datadir", datadir] if datadir else [])
+            (["--dev"] if dev else []) + \
+            (["--mine"] if mine else []) + \
+            (["--unlock", unlock] if unlock else []) + \
+            (["--password", password] if password else []) + \
+            (["--allow-insecure-unlock"] if allow_insecure_unlock else []) + \
+            (["--datadir", self.datadir] if self.datadir else []) + \
+            (["--http", "--http.addr", "0.0.0.0", "--http.port", str(http_port)])
         return command.buildcmd(args)
 
 

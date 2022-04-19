@@ -836,11 +836,22 @@ class Peggy2Environment(IntegrationTestsEnvironment):
         operator_acct = hardhat_accounts["operator"]
 
         if self.use_geth_instead_of_hardhat:
-            geth = Geth(self.cmd)
-            geth_datadir = self.cmd.mktempdir()
-            operator_addr = operator_acct[0]
-            geth.init(ethereum_chain_id, [operator_addr], datadir=geth_datadir, funds_alloc={operator_addr: 10**6})
-            geth_run_args = geth.buid_run_args(geth_datadir, ethereum_chain_id)
+            # Note: if the contracts were compiled previously for hardhat, or if previous deployment failed, you might
+            # have to remove smart-contracts/{build,cache,artifacts}
+            operator_addr, operator_private_key = operator_acct
+            # geth_datadir = self.cmd.mktempdir()
+            geth_datadir = "/tmp/geth"
+            self.cmd.rmdir(geth_datadir)
+            self.cmd.mkdir(geth_datadir)
+            password_file = "/tmp/geth_password"
+            self.cmd.write_text_file(password_file, "")
+            geth = Geth(self.cmd, datadir=geth_datadir)
+            for _, private_key in hardhat_default_accounts():
+                geth.create_account(private_key)
+            geth.init(ethereum_chain_id, [operator_addr], funds_alloc={operator_addr: 1000 * 10**18})
+            geth_run_args = geth.buid_run_args(ethereum_chain_id, http_port=8545, mine=True, unlock=operator_addr,
+                password=password_file, allow_insecure_unlock=True)
+            # geth_run_args = geth.buid_run_args(ethereum_chain_id, http_port=8545, dev=True)
             geth_proc = self.cmd.spawn_asynchronous_process(geth_run_args, log_file=hardhat_log_file)
             hardhat_proc = geth_proc
         else:
@@ -850,7 +861,7 @@ class Peggy2Environment(IntegrationTestsEnvironment):
             hardhat_proc = self.cmd.spawn_asynchronous_process(hardhat_exec_args, log_file=hardhat_log_file)
 
         hardhat.compile_smart_contracts()
-        peggy_sc_addrs = hardhat.deploy_smart_contracts()
+        peggy_sc_addrs = hardhat.deploy_smart_contracts(network="localhost")
 
         w3_websocket_address = eth.web3_host_port_url("localhost", hardhat_port)
         self.init_smart_contracts(w3_websocket_address, operator_acct, peggy_sc_addrs)
