@@ -18,6 +18,8 @@ import {
   SifchainContractFactories,
 } from "../src/tsyringe/contracts"
 import * as dotenv from "dotenv"
+import {SifchainAccounts} from "../src/tsyringe/sifchainAccounts";
+import {createSignerWithAddresss} from "../src/tsyringe/hardhatSupport";
 export type DeployedContractAddresses = {
   cosmosBridge: string
   bridgeBank: string
