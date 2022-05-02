@@ -25,8 +25,6 @@ const wakeupTimer = 5
 
 // StartProphecyHandler start Cosmos chain subscription and process prophecy completed message
 func (sub CosmosSub) StartProphecyHandler(txFactory tx.Factory, completionEvent *sync.WaitGroup, symbolTranslator *symbol_translator.SymbolTranslator) {
-	defer completionEvent.Done()
-	time.Sleep(time.Second)
 	client, err := tmClient.New(sub.TmProvider, "/websocket")
 	if err != nil {
 		sub.SugaredLogger.Errorw("failed to initialize a sifchain client.",
@@ -37,8 +35,6 @@ func (sub CosmosSub) StartProphecyHandler(txFactory tx.Factory, completionEvent 
 	if err := client.Start(); err != nil {
 		sub.SugaredLogger.Errorw("failed to start a sifchain client.",
 			errorMessageKey, err.Error())
-		completionEvent.Add(1)
-		go sub.Start(txFactory, completionEvent, symbolTranslator)
 		return
 	}
 
@@ -89,13 +85,9 @@ func (sub CosmosSub) handleNewProphecyCompleted(client *tmClient.HTTP) {
 		return
 	}
 
-<<<<<<< Updated upstream
-	prophecyInfoArray := GetAllPropheciesCompleted(sub.SifnodeGrpc, sub.NetworkDescriptor, lastSubmittedNonce.Uint64()+1)
-=======
 	sub.SugaredLogger.Infow("Last submitted nonce", "LastSubmittedNonce", lastSubmittedNonce)
 
-	prophecyInfoArray := GetAllProphciesCompleted(sub.TmProvider, sub.NetworkDescriptor, lastSubmittedNonce.Uint64()+1)
->>>>>>> Stashed changes
+	prophecyInfoArray := getAllPropheciesCompleted(sub.TmProvider, sub.NetworkDescriptor, lastSubmittedNonce.Uint64()+1)
 
 	// send the prophecy by batch, maximum is 5 prophecies in each batch
 	// compute how many batches needed, last batch may less than 5
@@ -167,7 +159,7 @@ func (sub CosmosSub) handleBatchProphecyCompleted(
 // 1. Call ethereum and get lastNonceSubmitted
 // 2. Call this function with the lastNonceSubmitted on ethereum side
 // 3. This function returns all of the prophecies that need to be relayed from sifchain to that EVM chain
-func GetAllPropheciesCompleted(sifnodeGrpc string, networkDescriptor oracletypes.NetworkDescriptor, startGlobalSequence uint64) []*oracletypes.ProphecyInfo {
+func getAllPropheciesCompleted(sifnodeGrpc string, networkDescriptor oracletypes.NetworkDescriptor, startGlobalSequence uint64) []*oracletypes.ProphecyInfo {
 	conn, err := grpc.Dial(sifnodeGrpc, grpc.WithInsecure())
 	if err != nil {
 		return []*oracletypes.ProphecyInfo{}
