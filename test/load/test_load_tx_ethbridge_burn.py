@@ -85,7 +85,7 @@ def test_single_sif_to_multiple_eth_account_burn_eth(ctx: test_utils.EnvCtx):
 
 # short test to verify eth burn works
 def test_load_tx_ethbridge_burn_eth_short(ctx: test_utils.EnvCtx):
-    transfer_table = [[2, 2], [2, 2]]
+    transfer_table = [[20, 20]]
     amount_per_tx = 1000100101
     _test_load_tx_ethbridge_lock_burn(ctx, amount_per_tx, transfer_table, None)
 
@@ -271,11 +271,7 @@ def _test_load_tx_ethbridge_lock_burn(ctx: test_utils.EnvCtx, amount_per_tx: int
     last_change_time = None
     last_change = None
     last_change_timeout = 90
-<<<<<<< HEAD
     cumulative_timeout = 30 + sum_all * 10  # Equivalent to min rate of 0.1 tps
-=======
-    cumulative_timeout = sum_all * 100  # Equivalent to min rate of 0.1 tps
->>>>>>> Update witness/relayer wakeup time, simplify tests
     while True:
         if token_address == None:
             token_balances = [ctx.eth.get_eth_balance(eth_acct) for eth_acct in eth_accts]
@@ -326,13 +322,10 @@ if __name__ == "__main__":
     basic_logging_setup()
     from siftool import test_utils
     ctx = test_utils.get_env_ctx()
-<<<<<<< HEAD
-    test_single_sif_to_multiple_eth_account_lock_rowan(ctx)
-    test_single_sif_to_multiple_eth_account_burn_erc20(ctx)
-    test_single_sif_to_multiple_eth_account_burn_eth(ctx)
+    # test_single_sif_to_multiple_eth_account_lock_rowan(ctx)
+    # test_single_sif_to_multiple_eth_account_burn_erc20(ctx)
+    # test_single_sif_to_multiple_eth_account_burn_eth(ctx)
+    # test_load_tx_ethbridge_burn_eth_short(ctx)
+    # test_load_tx_ethbridge_burn_eth(ctx)
     test_load_tx_ethbridge_burn_eth_short(ctx)
-    test_load_tx_ethbridge_burn_eth(ctx)
-=======
-    # test_load_tx_ethbridge_burn_short(ctx)
-    test_load_tx_ethbridge_burn(ctx)
->>>>>>> Update witness/relayer wakeup time, simplify tests
+    # test_load_tx_ethbridge_burn(ctx)
