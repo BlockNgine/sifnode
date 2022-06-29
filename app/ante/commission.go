@@ -8,6 +8,7 @@ import (
 )
 
 var minCommission = sdk.NewDecWithPrec(5, 2) // 5%
+var maxVotingPower = 10
 
 // TODO: remove once Cosmos SDK is upgraded to v0.46, refer to https://github.com/cosmos/cosmos-sdk/pull/10529#issuecomment-1026320612
 
@@ -68,23 +69,25 @@ func (vcd ValidateMinCommissionDecorator) validateMsg(ctx sdk.Context, msg sdk.M
 		}
 	case *stakingtypes.MsgDelegate:
 		val, err := vcd.getValidator(ctx, msg.ValidatorAddress)
+		var votingPower := val.GetTokens() / vcd.GetBondedPool(ctx) * 100
 		if err != nil {
 			return err
 		}
-		if val.GetCommission().LT(minCommission) {
+		if votingPower >= maxVotingPower {
 			return sdkerrors.Wrapf(
 				sdkerrors.ErrInvalidRequest,
-				"cannot delegate to validator with commission lower than minimum of %s", minCommission)
+				"Cannot delegate to a validator with %s or higher voting power, please choose another validator", maxVotingPower)
 		}
 	case *stakingtypes.MsgBeginRedelegate:
 		val, err := vcd.getValidator(ctx, msg.ValidatorDstAddress)
+		var votingPower := val.GetTokens() / vcd.GetBondedPool(ctx) * 100
 		if err != nil {
 			return err
 		}
-		if val.GetCommission().LT(minCommission) {
+		if votingPower >= maxVotingPower {
 			return sdkerrors.Wrapf(
 				sdkerrors.ErrInvalidRequest,
-				"cannot redelegate to validator with commission lower than minimum of %s", minCommission)
+				"Cannot delegate to a validator with %s or higher voting power, please choose another validator", maxVotingPower)
 		}
 	}
 	return nil
