@@ -69,7 +69,7 @@ func (vcd ValidateMinCommissionDecorator) validateMsg(ctx sdk.Context, msg sdk.M
 		}
 	case *stakingtypes.MsgDelegate:
 		val, err := vcd.getValidator(ctx, msg.ValidatorAddress)
-		var votingPower := val.GetTokens() / vcd.GetBondedPool(ctx) * 100
+		var votingPower = val.GetTokens() / vcd.GetBondedPool(ctx) * 100
 		if err != nil {
 			return err
 		}
@@ -80,7 +80,7 @@ func (vcd ValidateMinCommissionDecorator) validateMsg(ctx sdk.Context, msg sdk.M
 		}
 	case *stakingtypes.MsgBeginRedelegate:
 		val, err := vcd.getValidator(ctx, msg.ValidatorDstAddress)
-		var votingPower := val.GetTokens() / vcd.GetBondedPool(ctx) * 100
+		var votingPower = val.GetTokens() / vcd.GetBondedPool(ctx) * 100
 		if err != nil {
 			return err
 		}
